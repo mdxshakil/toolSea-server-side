@@ -15,6 +15,7 @@ async function run() {
     try {
         await client.connect();
         const usersCollection = client.db('toolSea').collection('users');
+        const reviewsCollection = client.db('toolSea').collection('reviews');
 
         //put user info on db while user logs in and issue a token for user
         app.put('/users/:email', async (req, res) => {
@@ -38,7 +39,18 @@ async function run() {
             const user = await usersCollection.findOne(query);
             res.send(user);
         })
-        
+        //get reviews from user
+        app.post('/review', async(req,res)=>{
+            const review = req.body;
+            const result = await reviewsCollection.insertOne(review);
+            res.send(result);
+        })
+        //load all the reviews
+        app.get('/review', async(req,res)=>{
+            const query = {};
+            const reviews = await reviewsCollection.find(query).toArray();
+            res.send(reviews);
+        })
     }
     finally {
         // await client.close()
