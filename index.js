@@ -42,13 +42,15 @@ async function run() {
         //get reviews from user
         app.post('/review', async(req,res)=>{
             const review = req.body;
+            console.log(review);
             const result = await reviewsCollection.insertOne(review);
             res.send(result);
         })
-        //load all the reviews
+        //load all the reviews reverse order with limit
         app.get('/review', async(req,res)=>{
-            const query = {};
-            const reviews = await reviewsCollection.find(query).toArray();
+            // const query = {};
+            // const reviews = await reviewsCollection.find(query).toArray();
+            const reviews = await reviewsCollection.find().sort({$natural: -1 }).limit(6).toArray();
             res.send(reviews);
         })
     }
