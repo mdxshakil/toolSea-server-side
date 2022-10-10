@@ -12,15 +12,15 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 app.use(cors());
 app.use(express.json());
 
-const verifyJWT = (req,res,next) => {
+const verifyJWT = (req, res, next) => {
     const authHeader = req.headers.authorization;
-    if(!authHeader){
-        return res.status(401).send({message:'Unauthorized Access'})
+    if (!authHeader) {
+        return res.status(401).send({ message: 'Unauthorized Access' })
     }
     const token = authHeader.split(' ')[1];
-    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET,(err,decoded) =>{
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
         if (err) {
-            return res.status(403).send({message: 'Forbidden Access'})
+            return res.status(403).send({ message: 'Forbidden Access' })
         }
         req.decoded = decoded;
         next();
@@ -33,6 +33,7 @@ async function run() {
         await client.connect();
         const usersCollection = client.db('toolSea').collection('users');
         const reviewsCollection = client.db('toolSea').collection('reviews');
+        const productsCollection = client.db('toolSea').collection('products');
 
         //put user info on db while user logs in and issue a token for user
         app.put('/users/:email', async (req, res) => {
@@ -50,24 +51,31 @@ async function run() {
             res.send({ result, token });
         })
         //load specific user details
-        app.get('/user/:email', verifyJWT, async(req,res)=>{
+        app.get('/user/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
-            const query = {email:email};
+            const query = { email: email };
             const user = await usersCollection.findOne(query);
             res.send(user);
         })
         //get reviews from user
-        app.post('/review',verifyJWT, async(req,res)=>{
+        app.post('/review', verifyJWT, async (req, res) => {
             const review = req.body;
             const result = await reviewsCollection.insertOne(review);
             res.send(result);
         })
         //load all the reviews reverse order with limit
-        app.get('/review',verifyJWT, async(req,res)=>{
+        app.get('/review', verifyJWT, async (req, res) => {
             // const query = {};
             // const reviews = await reviewsCollection.find(query).toArray();
-            const reviews = await reviewsCollection.find().sort({$natural: -1 }).limit(6).toArray();
+            const reviews = await reviewsCollection.find().sort({ $natural: -1 }).limit(6).toArray();
             res.send(reviews);
+        })
+        //add new product to db
+        app.post('/product', verifyJWT, async (req, res) => {
+            const newProduct = req.body;
+            console.log(newProduct);
+            const result = await productsCollection.insertOne(newProduct);
+            res.send(result);
         })
     }
     finally {
