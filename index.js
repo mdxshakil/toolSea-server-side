@@ -88,12 +88,18 @@ async function run() {
             res.send(product);
         })
         //add orders to db
-        app.post('/order', async(req,res)=>{
+        app.post('/order', verifyJWT, async(req,res)=>{
             const order = req.body;
             const result = await ordersCollection.insertOne(order);
             res.send(result);
         })
-
+        //load orders according user
+        app.get('/order',verifyJWT, async(req,res)=>{
+            const email = req.query.user;
+            const query = {email:email}
+            const order = await ordersCollection.find(query).toArray();
+            res.send(order);
+        })
     }
     finally {
         // await client.close()
