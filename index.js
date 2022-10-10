@@ -4,7 +4,7 @@ const cors = require('cors');
 const port = process.env.PORT || 5000;
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.1kye1ty.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
@@ -34,6 +34,7 @@ async function run() {
         const usersCollection = client.db('toolSea').collection('users');
         const reviewsCollection = client.db('toolSea').collection('reviews');
         const productsCollection = client.db('toolSea').collection('products');
+        const ordersCollection = client.db('toolSea').collection('orders');
 
         //put user info on db while user logs in and issue a token for user
         app.put('/users/:email', async (req, res) => {
@@ -65,18 +66,34 @@ async function run() {
         })
         //load all the reviews reverse order with limit
         app.get('/review', verifyJWT, async (req, res) => {
-            // const query = {};
-            // const reviews = await reviewsCollection.find(query).toArray();
             const reviews = await reviewsCollection.find().sort({ $natural: -1 }).limit(6).toArray();
             res.send(reviews);
         })
         //add new product to db
         app.post('/product', verifyJWT, async (req, res) => {
             const newProduct = req.body;
-            console.log(newProduct);
             const result = await productsCollection.insertOne(newProduct);
             res.send(result);
         })
+        //get 6 products for homepage
+        app.get('/product', async (req, res) => {
+            const products = await productsCollection.find().sort({ $natural: -1 }).limit(6).toArray();
+            res.send(products);
+        })
+        //load specific product details
+        app.get('/product/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const query = {_id: ObjectId (id)};
+            const product = await productsCollection.findOne(query);
+            res.send(product);
+        })
+        //add orders to db
+        app.post('/order', async(req,res)=>{
+            const order = req.body;
+            const result = await ordersCollection.insertOne(order);
+            res.send(result);
+        })
+
     }
     finally {
         // await client.close()
