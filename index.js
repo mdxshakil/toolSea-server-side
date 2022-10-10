@@ -75,6 +75,20 @@ async function run() {
             const result = await productsCollection.insertOne(newProduct);
             res.send(result);
         })
+        //reduce stock after order place
+        app.put('/product/:id', verifyJWT, async(req,res)=>{
+            const id = req.params.id;
+            const updatedQuantity = req.body;
+            const filter = {_id: ObjectId (id)};
+            const options = {upsert : true};
+            const updatedDoc = {
+                $set: {
+                    availableQuantity: updatedQuantity.availableQuantity
+                }
+            }
+            const result = await productsCollection.updateOne(filter, updatedDoc, options);
+            res.send(result);
+        })
         //get 6 products for homepage
         app.get('/product', async (req, res) => {
             const products = await productsCollection.find().sort({ $natural: -1 }).limit(6).toArray();
