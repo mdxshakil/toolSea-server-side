@@ -64,10 +64,11 @@ async function run() {
         //make user admin
         app.put('/user/admin/:email', verifyJWT, verifyADMIN, async (req, res) => {
             const email = req.params.email; //whom should be admin
+            const userRole = req.body;
             const filter = { email: email };
             const options = { upsert: true };
             const updatedDoc = {
-                $set: { role: 'admin' }
+                $set: userRole
             };
             const result = await usersCollection.updateOne(filter, updatedDoc, options);
             res.send(result);
@@ -150,7 +151,7 @@ async function run() {
             const isAdmin = user?.role === 'admin';
             res.send({ admin: isAdmin });
         })
-        //
+        //load all the products
         app.get('/products', verifyJWT, verifyADMIN, async(req,res)=>{
             const query = ({});
             const products = await productsCollection.find().toArray();
