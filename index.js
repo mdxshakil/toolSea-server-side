@@ -35,7 +35,17 @@ async function run() {
         const reviewsCollection = client.db('toolSea').collection('reviews');
         const productsCollection = client.db('toolSea').collection('products');
         const ordersCollection = client.db('toolSea').collection('orders');
-
+        //verify admin
+        const verifyADMIN = async (req, res, next) => {
+            const requester = req.decoded.email;
+            const requesterAccount = await usersCollection.findOne({ email: requester });
+            if (requesterAccount.role === 'admin') {
+                next();
+            }
+            else (
+                res.status(403).send({ message: 'Forbidden Access' })
+            )
+        }
         //put user info on db while user logs in and issue a token for user
         app.put('/users/:email', async (req, res) => {
             const email = req.params.email;
@@ -51,6 +61,18 @@ async function run() {
             })
             res.send({ result, token });
         })
+        //make user admin
+        app.put('/user/admin/:email', verifyJWT, verifyADMIN, async (req, res) => {
+            const email = req.params.email; //whom should be admin
+            const filter = { email: email };
+            const options = { upsert: true };
+            const updatedDoc = {
+                $set: { role: 'admin' }
+            };
+            const result = await usersCollection.updateOne(filter, updatedDoc, options);
+            res.send(result);
+
+        })
         //load specific user details
         app.get('/user/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
@@ -58,7 +80,13 @@ async function run() {
             const user = await usersCollection.findOne(query);
             res.send(user);
         })
-        //get reviews from user
+        //load all user details
+        app.get('/users', verifyJWT, verifyADMIN, async (req, res) => {
+            const query = {};
+            const users = await usersCollection.find(query).toArray()
+            res.send(users);
+        })
+        //store user reviews to db
         app.post('/review', verifyJWT, async (req, res) => {
             const review = req.body;
             const result = await reviewsCollection.insertOne(review);
@@ -70,17 +98,17 @@ async function run() {
             res.send(reviews);
         })
         //add new product to db
-        app.post('/product', verifyJWT, async (req, res) => {
+        app.post('/product', verifyJWT, verifyADMIN, async (req, res) => {
             const newProduct = req.body;
             const result = await productsCollection.insertOne(newProduct);
             res.send(result);
         })
         //reduce stock after order place
-        app.put('/product/:id', verifyJWT, async(req,res)=>{
+        app.put('/product/:id', verifyJWT, async (req, res) => {
             const id = req.params.id;
             const updatedQuantity = req.body;
-            const filter = {_id: ObjectId (id)};
-            const options = {upsert : true};
+            const filter = { _id: ObjectId(id) };
+            const options = { upsert: true };
             const updatedDoc = {
                 $set: {
                     availableQuantity: updatedQuantity.availableQuantity
@@ -90,29 +118,43 @@ async function run() {
             res.send(result);
         })
         //get 6 products for homepage
-        app.get('/product', async (req, res) => {
+        app.get('/product', verifyJWT, async (req, res) => {
             const products = await productsCollection.find().sort({ $natural: -1 }).limit(6).toArray();
             res.send(products);
         })
         //load specific product details
         app.get('/product/:id', verifyJWT, async (req, res) => {
             const id = req.params.id;
-            const query = {_id: ObjectId (id)};
+            const query = { _id: ObjectId(id) };
             const product = await productsCollection.findOne(query);
             res.send(product);
         })
         //add orders to db
-        app.post('/order', verifyJWT, async(req,res)=>{
+        app.post('/order', verifyJWT, async (req, res) => {
             const order = req.body;
             const result = await ordersCollection.insertOne(order);
             res.send(result);
         })
         //load orders according user
-        app.get('/order',verifyJWT, async(req,res)=>{
+        app.get('/order', verifyJWT, async (req, res) => {
             const email = req.query.user;
-            const query = {email:email}
+            const query = { email: email }
             const order = await ordersCollection.find(query).toArray();
             res.send(order);
+        })
+        //check user admin or not
+        app.get('/admin/:email', verifyJWT, async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            const isAdmin = user?.role === 'admin';
+            res.send({ admin: isAdmin });
+        })
+        //
+        app.get('/products', verifyJWT, verifyADMIN, async(req,res)=>{
+            const query = ({});
+            const products = await productsCollection.find().toArray();
+            res.send(products);
         })
     }
     finally {
