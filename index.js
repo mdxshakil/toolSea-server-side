@@ -109,7 +109,7 @@ async function run() {
             const id = req.params.id;
             const query = {_id: ObjectId (id)};
             const result = productsCollection.deleteOne(query);
-            res.send(result)
+            res.send(result);
         })
         //load 6 products for homepage
         app.get('/product', verifyJWT, async (req, res) => {
