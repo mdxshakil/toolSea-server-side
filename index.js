@@ -104,7 +104,25 @@ async function run() {
             const result = await productsCollection.insertOne(newProduct);
             res.send(result);
         })
-        //reduce stock after order place
+        //delete product from db
+        app.delete('/product/:id', verifyJWT, verifyADMIN, async(req,res)=>{
+            const id = req.params.id;
+            const query = {_id: ObjectId (id)};
+            const result = productsCollection.deleteOne(query);
+            res.send(result)
+        })
+        //load 6 products for homepage
+        app.get('/product', verifyJWT, async (req, res) => {
+            const products = await productsCollection.find().sort({ $natural: -1 }).limit(6).toArray();
+            res.send(products);
+        })
+        //load all the products for manage products
+        app.get('/products', verifyJWT, verifyADMIN, async(req,res)=>{
+            const query = ({});
+            const products = await productsCollection.find().toArray();
+            res.send(products);
+        })
+        //reduce stock and update min order quantity after order place
         app.put('/product/:id', verifyJWT, async (req, res) => {
             const id = req.params.id;
             const updatedQuantity = req.body;
@@ -112,16 +130,27 @@ async function run() {
             const options = { upsert: true };
             const updatedDoc = {
                 $set: {
-                    availableQuantity: updatedQuantity.availableQuantity
+                    availableQuantity: updatedQuantity.availableQuantity,
+                    minOrderQuantity: updatedQuantity.minOrderQuantity
                 }
             }
             const result = await productsCollection.updateOne(filter, updatedDoc, options);
             res.send(result);
         })
-        //get 6 products for homepage
-        app.get('/product', verifyJWT, async (req, res) => {
-            const products = await productsCollection.find().sort({ $natural: -1 }).limit(6).toArray();
-            res.send(products);
+        //update product available quantity/stock by admin
+        app.put('/product/stock/:id', verifyJWT, verifyADMIN, async (req, res) => {
+            const id = req.params.id;
+            const updatedQuantity = req.body;
+            const filter = { _id: ObjectId(id) };
+            const options = { upsert: true };
+            const updatedDoc = {
+                $set: {
+                    availableQuantity: updatedQuantity.newStock,
+                    minOrderQuantity : updatedQuantity.newMinOrder
+                }
+            }
+            const result = await productsCollection.updateOne(filter, updatedDoc, options);
+            res.send(result);
         })
         //load specific product details
         app.get('/product/:id', verifyJWT, async (req, res) => {
@@ -150,12 +179,6 @@ async function run() {
             const user = await usersCollection.findOne(query);
             const isAdmin = user?.role === 'admin';
             res.send({ admin: isAdmin });
-        })
-        //load all the products
-        app.get('/products', verifyJWT, verifyADMIN, async(req,res)=>{
-            const query = ({});
-            const products = await productsCollection.find().toArray();
-            res.send(products);
         })
     }
     finally {
