@@ -7,6 +7,8 @@ require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.1kye1ty.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
 
 // middle wires
 app.use(cors());
@@ -35,6 +37,7 @@ async function run() {
         const reviewsCollection = client.db('toolSea').collection('reviews');
         const productsCollection = client.db('toolSea').collection('products');
         const ordersCollection = client.db('toolSea').collection('orders');
+        const paymentsCollection = client.db('toolSea').collection('payments');
         //verify admin
         const verifyADMIN = async (req, res, next) => {
             const requester = req.decoded.email;
@@ -60,6 +63,33 @@ async function run() {
                 expiresIn: '1d'
             })
             res.send({ result, token });
+        })
+        //payment intent api
+        app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+            const product = req.body;
+            const price = product.totalPrice;
+            const amount = price * 100;
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'USD',
+                payment_method_types: ['card']
+            });
+            res.send({clientSecret: paymentIntent.client_secret,});
+        })
+        //update payment info
+        app.patch('/order/:id', verifyJWT, async(req,res)=>{
+            const id =req.params.id;
+            const payment =req.body;
+            const filter = {_id: ObjectId (id)};
+            const updatedDoc = {
+                $set : {
+                    paid:true,
+                    transactionId: payment.transactionId
+                }
+            }
+            const paymentResult = await ordersCollection.updateOne(filter, updatedDoc);
+            const paymentCollection = await paymentsCollection.insertOne(payment);
+            res.send(updatedDoc);
         })
         //make user admin
         app.put('/user/admin/:email', verifyJWT, verifyADMIN, async (req, res) => {
@@ -105,9 +135,9 @@ async function run() {
             res.send(result);
         })
         //delete product from db
-        app.delete('/product/:id', verifyJWT, verifyADMIN, async(req,res)=>{
+        app.delete('/product/:id', verifyJWT, verifyADMIN, async (req, res) => {
             const id = req.params.id;
-            const query = {_id: ObjectId (id)};
+            const query = { _id: ObjectId(id) };
             const result = productsCollection.deleteOne(query);
             res.send(result);
         })
@@ -117,7 +147,13 @@ async function run() {
             res.send(products);
         })
         //load all the products for manage products
-        app.get('/products', verifyJWT, verifyADMIN, async(req,res)=>{
+        app.get('/products', verifyJWT, verifyADMIN, async (req, res) => {
+            const query = ({});
+            const products = await productsCollection.find().toArray();
+            res.send(products);
+        })
+        //load all the products for users
+        app.get('/tools', verifyJWT, async (req, res) => {
             const query = ({});
             const products = await productsCollection.find().toArray();
             res.send(products);
@@ -146,7 +182,7 @@ async function run() {
             const updatedDoc = {
                 $set: {
                     availableQuantity: updatedQuantity.newStock,
-                    minOrderQuantity : updatedQuantity.newMinOrder
+                    minOrderQuantity: updatedQuantity.newMinOrder
                 }
             }
             const result = await productsCollection.updateOne(filter, updatedDoc, options);
@@ -165,6 +201,13 @@ async function run() {
             const result = await ordersCollection.insertOne(order);
             res.send(result);
         })
+        //load specific order for payment
+        app.get('/order/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const item = await ordersCollection.findOne(query);
+            res.send(item);
+        })
         //load orders according user
         app.get('/order', verifyJWT, async (req, res) => {
             const email = req.query.user;
@@ -172,6 +215,33 @@ async function run() {
             const order = await ordersCollection.find(query).toArray();
             res.send(order);
         })
+        //load all the orders for admin management
+        app.get('/orders', verifyJWT, verifyADMIN, async(req,res)=>{
+            const query = {};
+            const orders = await ordersCollection.find(query).toArray();
+            res.send(orders);
+        })
+        //delete an specific order
+        app.delete('/order/:id', verifyJWT, async(req,res)=>{
+            const id =req.params.id;
+            const query = {_id: ObjectId (id)}
+            const result = (await ordersCollection.deleteOne(query));
+            res.send(result);
+        })
+        //update order status by admin
+        app.put('/order/:id', verifyJWT, verifyADMIN, async(req,res)=>{
+            const id = req.params.id;
+            const query = {_id: ObjectId (id)};
+            const options = {upsert : true};
+            const updatedDoc = {
+                $set: {
+                    orderStatus: 'Out for delivery'
+                }
+            }
+            const result = await ordersCollection.updateOne(query, updatedDoc, options);
+            res.send(result);
+        })
+        app.put
         //check user admin or not
         app.get('/admin/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
