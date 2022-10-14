@@ -76,7 +76,7 @@ async function run() {
             });
             res.send({clientSecret: paymentIntent.client_secret,});
         })
-        //update payment info
+        //update payment info on db
         app.patch('/order/:id', verifyJWT, async(req,res)=>{
             const id =req.params.id;
             const payment =req.body;
