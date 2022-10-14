@@ -257,7 +257,7 @@ async function run() {
 }
 run().catch(console.dir);
 
-//server test
+//server test api
 app.get('/', (req, res) => {
     res.send('Hello from toolSea server World!')
 })
