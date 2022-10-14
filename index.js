@@ -259,7 +259,7 @@ run().catch(console.dir);
 
 
 app.get('/', (req, res) => {
-    res.send('Hello World!')
+    res.send('Hello from toolSea server World!')
 })
 
 app.listen(port, () => {
