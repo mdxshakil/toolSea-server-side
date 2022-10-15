@@ -8,6 +8,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.1kye1ty.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const nodemailer = require("nodemailer");
 
 
 // middle wires
@@ -38,6 +39,8 @@ async function run() {
         const productsCollection = client.db('toolSea').collection('products');
         const ordersCollection = client.db('toolSea').collection('orders');
         const paymentsCollection = client.db('toolSea').collection('payments');
+        const messagesCollection = client.db('toolSea').collection('messages');
+        const subscribersCollection = client.db('toolSea').collection('subscribers');
         //verify admin
         const verifyADMIN = async (req, res, next) => {
             const requester = req.decoded.email;
@@ -74,16 +77,16 @@ async function run() {
                 currency: 'USD',
                 payment_method_types: ['card']
             });
-            res.send({clientSecret: paymentIntent.client_secret,});
+            res.send({ clientSecret: paymentIntent.client_secret, });
         })
         //update payment info on db
-        app.patch('/order/:id', verifyJWT, async(req,res)=>{
-            const id =req.params.id;
-            const payment =req.body;
-            const filter = {_id: ObjectId (id)};
+        app.patch('/order/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const payment = req.body;
+            const filter = { _id: ObjectId(id) };
             const updatedDoc = {
-                $set : {
-                    paid:true,
+                $set: {
+                    paid: true,
                     transactionId: payment.transactionId
                 }
             }
@@ -216,23 +219,23 @@ async function run() {
             res.send(order);
         })
         //load all the orders for admin management
-        app.get('/orders', verifyJWT, verifyADMIN, async(req,res)=>{
+        app.get('/orders', verifyJWT, verifyADMIN, async (req, res) => {
             const query = {};
             const orders = await ordersCollection.find(query).toArray();
             res.send(orders);
         })
         //delete an specific order
-        app.delete('/order/:id', verifyJWT, async(req,res)=>{
-            const id =req.params.id;
-            const query = {_id: ObjectId (id)}
+        app.delete('/order/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) }
             const result = (await ordersCollection.deleteOne(query));
             res.send(result);
         })
         //update order status by admin
-        app.put('/order/:id', verifyJWT, verifyADMIN, async(req,res)=>{
+        app.put('/order/:id', verifyJWT, verifyADMIN, async (req, res) => {
             const id = req.params.id;
-            const query = {_id: ObjectId (id)};
-            const options = {upsert : true};
+            const query = { _id: ObjectId(id) };
+            const options = { upsert: true };
             const updatedDoc = {
                 $set: {
                     orderStatus: 'Out for delivery'
@@ -241,7 +244,6 @@ async function run() {
             const result = await ordersCollection.updateOne(query, updatedDoc, options);
             res.send(result);
         })
-        app.put
         //check user admin or not
         app.get('/admin/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
@@ -250,12 +252,58 @@ async function run() {
             const isAdmin = user?.role === 'admin';
             res.send({ admin: isAdmin });
         })
+        //user contact api - store user messsages
+        app.post('/messages/:email', verifyJWT, async (req, res) => {
+            const email = req.params.email;
+            const message = req.body;
+            const result = await messagesCollection.insertOne(message);
+            res.send(result)
+        })
+        //load user messages
+        app.get('/messages', verifyJWT, verifyADMIN, async (req, res) => {
+            res.send(await messagesCollection.find().toArray());
+        })
+        //store subscribers to db
+        app.put('/subscribers/:email', verifyJWT, async (req, res) => {
+            const email = req.params.email;
+            const subscriber = req.body;
+            console.log(subscriber);
+            const filter = { email: email };
+            const options = { upsert: true };
+            const updatedDoc = {
+                $set: {
+                    name: subscriber.name,
+                    email: subscriber.email,
+                    subscriber: true
+                }
+            }
+            const result = await subscribersCollection.updateOne(filter, updatedDoc, options);
+            res.send(result);
+        })
+        //load specific subscriber data
+        app.get('/subscribers/:email', verifyJWT, async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email };
+            const result = await subscribersCollection.findOne(query);
+            if (result) {
+                if (result.subscriber === true) {
+                    res.send({ subscriber: true })
+                }
+                else {
+                    res.send({ subscriber: false })
+                }
+            }
+            else{
+                res.send({ subscriber: false })
+            }
+        })
     }
     finally {
         // await client.close()
     }
 }
 run().catch(console.dir);
+
 
 //server test api
 app.get('/', (req, res) => {
@@ -265,3 +313,37 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
     console.log(`Example app listening on port ${port}`)
 })
+
+//Contact via mail api
+// app.post('/contact', verifyJWT, async (req, res) => {
+    // create reusable transporter object using the default SMTP transport
+//     let transporter = nodemailer.createTransport({
+//         service: "gmail",
+//         secure: false,
+//         auth: {
+//             user: process.env.MY_EMAIL,
+//             pass: process.env.MY_PASSWORD,
+//         },
+//     });
+
+    // Make the email
+//     let info = {
+//         from: process.env.USERS_EMAIL,
+//         to: process.env.MY_EMAIL,
+//         subject: 'AMP4EMAIL message',
+//         text: 'For clients with plaintext support only',
+//         html: `
+//         `
+//     };
+    //send the email
+//     transporter.sendMail(info, function (err, info) {
+//         if (err) {
+//             res.send(err);
+//             console.log(err);
+//         }
+//         else {
+//             res.send(info);
+//             console.log(info);
+//         }
+//     })
+// })
