@@ -127,7 +127,7 @@ async function run() {
             res.send(result);
         })
         //load all the reviews reverse order with limit
-        app.get('/review', verifyJWT, async (req, res) => {
+        app.get('/review', async (req, res) => {
             const reviews = await reviewsCollection.find().sort({ $natural: -1 }).limit(6).toArray();
             res.send(reviews);
         })
@@ -145,7 +145,7 @@ async function run() {
             res.send(result);
         })
         //load 6 products for homepage
-        app.get('/product', verifyJWT, async (req, res) => {
+        app.get('/product', async (req, res) => {
             const products = await productsCollection.find().sort({ $natural: -1 }).limit(6).toArray();
             res.send(products);
         })
@@ -156,7 +156,7 @@ async function run() {
             res.send(products);
         })
         //load all the products for users
-        app.get('/tools', verifyJWT, async (req, res) => {
+        app.get('/tools', async (req, res) => {
             const query = ({});
             const products = await productsCollection.find().toArray();
             res.send(products);
